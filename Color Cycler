@@ -1,0 +1,31 @@
+
+list realcolors = [
+<0.000000, 0.698039, 0.400000>, <0.000000, 0.600000, 0.600000>, 
+<0.000000, 0.400000, 0.698039>, <0.000000, 0.200000, 0.800000>];
+
+// keep time
+integer g_TIMER = 0;
+// the offset into the color array
+integer g_NDX = 0;
+
+default
+{
+
+    state_entry()
+    {
+        // turn the timer on/off        
+        //g_TIMER = !g_TIMER;
+        // cheeky use of flag as timer value
+        llSetTimerEvent( .02 );
+    }
+    
+
+    timer( )
+    {
+        if( g_NDX > llGetListLength( realcolors ) - 1) {
+            g_NDX = 0;
+        }
+        llSetColor( llList2Vector( realcolors, g_NDX), ALL_SIDES );
+        ++g_NDX;
+    }
+}
