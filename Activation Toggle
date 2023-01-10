@@ -1,0 +1,39 @@
+integer center_switch = 0;
+
+integer KeyToChannel(key id)
+{
+    string str = (string) id;
+    integer channel = 5381;
+    integer i;
+    for( i = 20 ; i >= 0 ; i-- )
+    {
+        channel = ( ( channel << 5 ) + channel ) + llSubStringIndex( " -0123456789abcdef", llGetSubString(str, i, i) );
+    }
+    if( channel == DEBUG_CHANNEL || ( channel >= -100000 && channel<= 100000 ) )
+    // Don't allow auto generated channels between -100 000 and 100 000 - or debug channel
+    // Reserve them for other purposes (like llDialog)
+    channel = channel + 123456;//Add value to it if it reaches this point.
+    return channel;
+}
+
+default
+{
+
+    touch_start(integer total_number)
+    {
+        if (center_switch == 0)
+        {
+            center_switch = 1;
+            llSetLinkPrimitiveParams(1, [PRIM_COLOR, 1, <0.169,0.898,0.933>, 1.0]);
+            //llSay(0, "Trasmitting on channel " + (string)KeyToChannel(llGetOwner()));
+            llWhisper(KeyToChannel(llGetOwner()), "Toggle On!");
+        }
+        else
+        {
+            center_switch = 0;
+            llSetLinkPrimitiveParams(1, [PRIM_COLOR, 1, <1.000,0.0,0.0>, 1.0]);
+            //llSay(0, "Trasmitting on channel " + (string)KeyToChannel(llGetOwner()));
+            llWhisper(KeyToChannel(llGetOwner()), "Toggle Off!");         
+        }
+    }
+}
