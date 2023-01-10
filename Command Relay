@@ -1,0 +1,192 @@
+// Command Relay script. 
+// Allows the supervisor relay to detect controllable adjuncts and relay commands to 
+// any adjuncts nearby.
+
+integer activator_toggle = 1;
+integer counter;
+integer listenHandle;
+integer s_switch_handle;
+//integer activator_handle;
+string command_text;
+string username;
+list adjunct_list;
+integer username_found;
+integer adjunct_found;
+list nearby_avatars;
+string selected_adjunct;
+key notecardQueryId; //Identifier for the dataserver event
+string notecardName = "Valid Adjuncts"; //Name of a notecard in the object's inventory.
+integer notecardLine; //Initialize the counter value at 0
+key notecardKey; //Store the notecard's key, so we don't read it again by accident.
+list notecardData; //List to store data read from the notecard.
+string praxis_report;
+
+integer KeyToChannel(key id)
+{
+    string str = (string) id;
+    integer channel = 5381;
+    integer i;
+    for( i = 20 ; i >= 0 ; i-- )
+    {
+        channel = ( ( channel << 5 ) + channel ) + llSubStringIndex( " -0123456789abcdef", llGetSubString(str, i, i) );
+    }
+    if( channel == DEBUG_CHANNEL || ( channel >= -100000 && channel<= 100000 ) )
+    // Don't allow auto generated channels between -100 000 and 100 000 - or debug channel
+    // Reserve them for other purposes (like llDialog)
+    channel = channel + 123456;//Add value to it if it reaches this point.
+    return channel;
+}
+
+ReadNotecard()
+{
+    if (llGetInventoryKey(notecardName) == NULL_KEY)
+    { //Check if the notecard exists in inventory, and is has been saved since it's creation (newly created notecards that are yet to be saved are assigned NULL_KEY).
+        llOwnerSay( "Notecard '" + notecardName + "' missing or unwritten."); //Notify user.
+        return; //Don't do anything else.
+    }
+    else if (llGetInventoryKey(notecardName) == notecardKey) return;
+    //This notecard has already been read - call to read was made in error, so don't do anything. (Notecards are assigned a new key each time they are saved.)
+
+    llOwnerSay("Began reading notecard: " + notecardName); //Notify user that read has started.
+    notecardData = []; //Clear the memory of the previous notecard.
+    notecardKey = llGetInventoryKey(notecardName); //Remember the key of this iteration of the notecard, so we don't read it again by accident.
+    notecardQueryId = llGetNotecardLine(notecardName, notecardLine);
+}
+
+default
+{
+    state_entry()
+    {
+        // Listen for a command on public chat
+        listenHandle = llListen(0, "", "", "");
+        // Listen for signals from the Supervisor Relay Switch object
+        s_switch_handle = llListen(KeyToChannel(llGetOwner()), "", "", "");
+        //activator_handle = llListen(-7834984356, "", "", "");
+        // Read and store list of valid adjuncts to command
+        ReadNotecard();
+    }
+
+    touch_start(integer num_detected)
+    {
+        //Test: read out contents of adjunct list.
+        llOwnerSay("Listing " + (string)llGetListLength(adjunct_list) + "elements from Adjunct List:");
+        for (counter = 0; counter <= llGetListLength(adjunct_list); counter++)
+        {
+            llOwnerSay(llList2String(adjunct_list, counter));
+        }
+        //llOwnerSay("Adjunct List = " + llDumpList2String(adjunct_list, ","));
+    }
+
+    listen(integer channel, string name, key id, string message)
+    {
+        // Only proceed with the rest of the functions if relay is active.
+        if (channel == KeyToChannel(llGetOwner()) && message == "Toggle On!")
+        {
+            activator_toggle = 1;
+            llOwnerSay("Supervisor Relay Active.");
+            llSetScriptState("Color Cycler",TRUE);
+        }
+        else if (channel == KeyToChannel(llGetOwner()) && message == "Toggle Off!")
+        {
+            activator_toggle = 0;
+            llOwnerSay("Supervisor Relay Disabled.");
+            llSetScriptState("Color Cycler",FALSE);
+        }
+        
+        if (activator_toggle == 1)
+        {
+            // Check for valid command prefix + content
+            if (llStringLength(message) > 3 && llGetSubString(llToUpper(message), 0, 2) == "SC:")
+            {
+                // Extract potential command
+                command_text = llStringTrim(llGetSubString(llToUpper(message), 3, -1), STRING_TRIM);
+                //llSay(0, "Command = " + command_text);
+                // Check for valid command syntax (SC:<username>,<command>)
+                if (llSubStringIndex(command_text, ",") == -1 && llToUpper(command_text) != "PRAXIS")
+                {
+                    llSay(0, "Error: Invalid Command Syntax");
+                }
+                // Supervisory command PRAXIS displays the contents of the "Valid Adjuncts" NC in local.
+                else if (llToUpper(command_text) == "PRAXIS")
+                {
+                    praxis_report = "";
+                    praxis_report = praxis_report + "The following adjuncts are administered by supervisory unit " + (string)llGetDisplayName(llGetOwner()) + ": ";
+                    for (counter = 0; counter <= llGetListLength(adjunct_list); counter++)
+                        praxis_report = praxis_report + llList2String(adjunct_list, counter) + " / ";
+                    praxis_report = praxis_report + "**END of Report**";
+                    llSay(0, praxis_report);
+                }
+                else
+                {
+                    // Read username parameter and check against list of allowed adjuncts.
+                    username = llGetSubString(command_text, 0, llSubStringIndex(command_text, ",") - 1);
+                    // Loop through user list. If valid username is not detected, speak an error
+                    username_found = 0;
+                    for (counter = 0; counter <= llGetListLength(adjunct_list); counter++)
+                    {
+                        if (llToUpper(llList2String(adjunct_list, counter)) == username)
+                        {
+                            username_found = 1;
+                            selected_adjunct = llList2String(adjunct_list, counter);
+                        }
+                    }
+                    if (username_found == 0)
+                        llSay(0, "NOTICE: Adjunct " + username + " not configured for supervision under unit " + (string)llGetUsername(llGetOwner()));
+                    else
+                    {
+                        llSay(0, "Routing command to adjunct " + selected_adjunct);
+                        // detect nearby avatars and compare against adjunct list. If username is not in this list, say an error
+                        adjunct_found = 0;
+                        nearby_avatars = llGetAgentList(AGENT_LIST_PARCEL, []);
+                        //llSay(DEBUG_CHANNEL,"Nearby: " + llDumpList2String(nearby_avatars,"\n")); // debug only
+                        for (counter = 0; counter <= llGetListLength(nearby_avatars); counter++)
+                        {
+                            //llOwnerSay(llToUpper(llGetUsername((key)llToUpper(llList2String(nearby_avatars, counter)))));
+                            if (llToUpper(llGetUsername((key)llToUpper(llList2String(nearby_avatars, counter)))) == username)
+                                adjunct_found = 1;
+                        }
+                        if (adjunct_found == 0)
+                            llSay(0, "Adjunct ident not detected. Unit may not be in proximity.");
+                        else
+                        {
+                            llOwnerSay("Username: " + username);
+                            llOwnerSay("Command Text: " + command_text);
+                            // Transmit command text on special channel for pickup by adjunct relay object.
+                            //llSay(0, command_text + "~" + (string)id);
+                            llSay(-29292929, command_text + "~" + (string)id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    dataserver(key query_id, string data)
+    {
+        if (query_id == notecardQueryId)
+        {
+            if (data == EOF) //Reached end of notecard (End Of File).
+            {
+                llOwnerSay("Done reading notecard, read " + (string) notecardLine + " notecard lines."); //Notify user.
+                //llSay(DEBUG_CHANNEL,"=== READ FROM NOTECARD: " + notecardName + " ===\n" + llDumpList2String(notecardData,"\n"));
+                adjunct_list = notecardData;
+                //Dump the contents of the notecard (for testing purposes).
+                //llOwnerSay("Server - adjunct_list = " + llDumpList2String(adjunct_list, ","));
+            }
+            else
+            {
+                notecardData += data; //Add the line being read to a new entry on the list.
+                ++notecardLine; //Increment line number (read next line).
+                notecardQueryId = llGetNotecardLine(notecardName, notecardLine); //Query the dataserver for the next notecard line.
+            }
+        }
+    }
+    
+    changed( integer change )
+    {
+        // Allows for automatic reset/re-read of "Valid Adjuncts" notecard in case of modification.
+        if (change & CHANGED_INVENTORY)
+            llResetScript();
+    }
+    
+}
