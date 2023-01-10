@@ -1,0 +1,98 @@
+list avatar_position_list;
+vector target_position;
+integer listen_handle;
+string adjunct_name;
+string command_text;
+key user_id;
+string commanded_name;
+integer coffee_flag;
+list command_queue; // Designed to hold a list of all recent command. Duplicates are to be 
+
+parse_command()
+{
+    if(llGetSubString(command_text, 0, 4) == "HELLO")
+    {
+        llSay(0, adjunct_name + ": Greetings.");
+        llResetScript();
+    }
+    else if(llGetSubString(command_text, 0, 3) == "COME")
+    {
+        coffee_flag = 0;
+        //llSay(0, adjunct_name + ": En route...");
+        llSensor("", user_id, AGENT, 96.0, PI);
+    }
+    else if(llGetSubString(command_text, 0, 3) == "GRON")
+    {
+        llSetScriptState("Anti-Griefer System", TRUE);
+        llSay(0, adjunct_name + ": Acknowledged. Scan mode active.");
+        llResetScript();
+    }
+    else if(llGetSubString(command_text, 0, 4) == "GROFF")
+    {
+        llSetScriptState("Anti-Griefer System", FALSE);
+        llSay(0, adjunct_name + ": Confirmed. Standing down from scan mode.");
+        llResetScript();
+    }
+    else if(llGetSubString(command_text, 0, 5) == "COFFEE")
+    {
+        coffee_flag = 1;
+        //llSay(0, adjunct_name + ": Coffee is up!");
+        llOwnerSay("@attach:Coffee=force (*)");
+        llOwnerSay("@detach:AO=force (*)");
+        llSensor("", user_id, AGENT, 96.0, PI);        
+    }
+    else
+        llSay(0, adjunct_name + ": Command not recognized.");
+}
+
+default
+{
+
+    state_entry()
+    {
+        listen_handle = llListen(-29292929, "", "", "");
+    }
+    
+    listen(integer channel, string name, key id, string message)
+    {
+        llListenRemove(listen_handle);
+        commanded_name = llToUpper(llGetUsername(llGetOwner()));
+        adjunct_name = llGetSubString(message, 0, llSubStringIndex(message, ",") - 1);
+        command_text = llGetSubString(message, llSubStringIndex(message, ",") + 1, llSubStringIndex(message, "~") - 1);
+        user_id = (key)llGetSubString(message, llSubStringIndex(message, "~") + 1, -1);
+        if (commanded_name == adjunct_name)
+        {
+            parse_command();
+            //llResetScript();
+        }
+    }
+    
+    touch_start(integer total_number)
+    {
+        llSay(0, "AG Script State: " + (string)llGetScriptState("Anti-Griefer System"));
+    }
+    
+    sensor( integer detected )
+    {
+        avatar_position_list = llGetObjectDetails(user_id,[OBJECT_POS]);
+        target_position = (vector)llList2String(avatar_position_list,0);
+        llMoveToTarget(target_position, 3.0);
+        llSetTimerEvent(3.0);
+    }
+    
+    timer()
+    {
+        llStopMoveToTarget( );
+        if(coffee_flag == 1)
+        {
+            llSay(0, adjunct_name + ": Coffee is up!");
+            llGiveInventory(user_id,"cupajoe");
+            llOwnerSay("@attach:AO=force (*)");
+            llOwnerSay("@detach:Coffee=force (*)");
+        }
+        else
+            llSay(0, adjunct_name + ": You called?");
+        llSetTimerEvent(0.0);
+        llResetScript();
+    }
+}
