@@ -1,0 +1,78 @@
+// Script to detect the presence of griefers by looking at the current
+// parcel's prim count. If the count increases dramatically over time,
+// the script will send an IM to that effect.
+// NOTE: Script requires the in-same-object presence of a NC entitled "AG Settings"
+//       This contains two values separated by :
+//       Prim Threshold:X
+//       Owner:UUID
+
+
+float gap = 1.0;
+integer current_prim_count;
+integer previous_prim_count;
+key NCLine;
+integer prim_threshold;
+string owner;
+
+    // Returns value to right of divider character
+    string right(string src, string divider) {
+        integer index = llSubStringIndex( src, divider );
+        if(~index)
+            return llDeleteSubString( src, 0, index + llStringLength(divider) - 1);
+        return src;
+    }
+
+    // Returns value to left of divider character
+    string left(string src, string divider) {
+        integer index = llSubStringIndex( src, divider );
+        if(~index)
+            return llDeleteSubString( src, index, -1);
+        return src;
+    }
+
+
+default {
+
+// Detect the current parcel's prim count for comparison
+    state_entry()
+    {
+        // Read AG Settings card
+        // set prim detection threshold to value of NC's line #2 (designate line 1 as index begins with 0)
+        // read owner UUID for messaging purposes
+        NCLine = llGetNotecardLine("AG Settings", 0);
+        NCLine = llGetNotecardLine("AG Settings", 1);
+
+        // Activate the timer listener every second
+        llSetTimerEvent(gap);
+        previous_prim_count = llGetParcelPrimCount(llGetPos(), 3, FALSE);
+    }
+
+// Event triggers when asynchronous data is received, e.g. llGetNotecardLine in state_entry event above.
+dataserver(key queryId, string data){
+
+        //llInstantMessage((string) owner, data);
+        //If on line 0, Set threshold global variable to value read from NC
+    
+        if (left(data, ":") == "Prim Threshold") {
+            prim_threshold = (integer) right(data, ":");
+        }
+        //If on line 1, read owner UUID
+        if (left(data, ":") == "Owner") {
+            owner = right(data, ":");
+        }
+}
+
+timer(){
+        // Detect prim count in current parcel
+        current_prim_count = llGetParcelPrimCount(llGetPos(), 3, FALSE);
+        // Compare current count with the previous count. 
+        // If the difference is higher than the threshold,
+        // a potential griefer is rezzing in the area.
+        // Send an IM to that effect.
+        if (current_prim_count - previous_prim_count >= prim_threshold){
+            llWhisper(0, "ALERT: Rez threshold exceeded. Possible griefer detected in region.");
+        }
+        // Get a new prim count for the next comparison.
+        previous_prim_count = current_prim_count;
+    }
+}
