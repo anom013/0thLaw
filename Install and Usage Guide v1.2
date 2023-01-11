@@ -1,0 +1,74 @@
+0th Law Supervisor/Adjunct Relay and Command System (S/ARCS) 
+v1.2
+
+Summary
+=============
+S/ARCS is intended to create a localized (single parcel) network of robotic units that are able to automatically respond to commands issued by any standard human-controlled avatar.
+
+A single sentient unit serves as a “Supervisor”. This unit authorizes, translates and commands all adjunct units within a 20 meter radius (standard “say” range). NOTE: The avatar issuing commands must not have chat-forwarding enabled. An example of an avatar with chat-forwarding enabled would be one equipped with a standard Nanite Systems controller.
+
+Any number of additional units may serve as “Adjuncts” within the network. These units receive and execute commands translated and forwarded by the Supervisor.
+
+To prevent tampering or malicious use, the following security measures are built into S/ARCS components:
+* Each supervisor maintains a list of "authorized" adjuncts, allowing for adjuncts to be shared across supervisors, unique adjuncts only used by one supervisor, or a combination of the two.
+* A Supervisor may deactivate its relay, thus preventing reception of commands.
+
+Components
+=============
+Each S/ARCS network consists of three types of components:
+
+1. Supervisor Relay: While active, receives commands issued in local chat, translates them, and attempts to forward them to the specified adjunct unit.
+
+2. Supervisor Relay Switch: Used by a supervisor to enable and disable its Supervisor Relay.
+
+3. Adjunct Relay: Receives commands issued through a Supervisor Relay and attempts to execute them.
+
+Setup Procedure
+=============
+Select a unit to serve in the role of a Supervisor.
+
+Attach one copy each of both the Supervisor Relay and Supervisor Relay Switch to the selected unit. The switch is meant to attach to a supervisor unit’s HUD, and the relay itself is meant to attach to the unit avatar itself.
+
+Using SL's build tools, edit the Supervisor Relay and open the Notecard entitled "Valid Adjuncts". In this notecard, add the SL names of each unit you wish to make use of as an authorized adjunct. NOTE: only one name per line is allowed.
+
+Attach one Adjunct Relay to each unit chosen to serve as an authorized Adjunct in the network.
+
+Another avatar (without chat-forwarding enabled) issues a command in proximity to a supervisor unit.
+
+If located within 20 meters of an active supervisor relay, the specified adjunct will attempt to respond.
+
+Supervisor Relay Usage
+=============
+On the HUD, click the Supervisor Relay Switch to toggle the Supervisor Relay on and off. A message will appear in the supervisor’s chat window to confirm the current relay status.
+
+In addition an external party can check the status of the relay by observing its appearance. If the color of the relay is solid, the relay is inactive. However, if the colors are cycling, status is active.
+
+Caution: Power Usage - If the Supervisor Unit is equipped with a Nanite Systems CSU (Chassis Specification Unit) or any similar device, remember: chatting consumes power! Each received command that is preceded by the proper “command prefix” (see below), is relayed via chat channel by the supervisor relay and thus will consume a certain amount of power. Be sure to configure your CSU accordingly. Note that the Supervisor Relay uses a standard “say” and the Supervisor Relay Switch uses a “whisper”, which uses less power.
+
+User Commands
+=============
+In order to issue commands to a S/ARCS network, an avatar must have chat forwarding disabled and be standing within range of a supervisor unit with an active Supervisor Relay.
+
+In order for any command to be executed, it must be issued in the following format:
+SC:<adjunct_name>,<command>
+
+“SC:” is the command prefix. NOTE: there is currently no trailing space after the “:” character.
+
+The parameter <adjunct_name> is the SL name of the desired adjunct avatar.
+
+The parameter <command> is any valid command in the Instruction Set (see below).
+
+Example: The following example assumes an adjunct with the SL name of “Robbie”:
+SC:Robbie,COME
+EXCEPTION: The PRAXIS command does not follow the above syntax. See that command's entry for more details.
+
+Command List
+=============
+The following is a description of all commands available to users of S/ARCS v1.0:
+
+COFFEE - Instructs the unit to approach the user and offer a tall cup of coffee. The cup is a user-attachable object that can be accepted or refused.
+COME - Forces the adjunct to approach the user
+GRON - Activates parcel prim security scan routine. Upon detecting more prims being rezzed in a parcel beyond a certain threshold (indicating the presence of a griefing weapon), the adjunct will report in local. NOTE: as of this writing, the current threshold is 10 prims rezzed per second.
+GROFF - Deactivates parcel prim security scan.
+HELLO - Test command that will force a return greeting from the Adjunct’s relay.
+PRAXIS - Direct command to all supervisors within range. Returns a list of all adjuncts administered by each supervisor. NOTE: PRAXIS does not accept adjunct names. Syntax is simply "SC:PRAXIS".
